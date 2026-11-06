@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sun Compass</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: #0b0f17;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            padding: 1.5rem;
+        }
+
+        .app-container {
+            max-width: 720px;
+            width: 100%;
+            background: #141b26;
+            border-radius: 3.5rem;
+            box-shadow: 0 25px 50px -8px rgba(0, 0, 0, 0.8), inset 0 1px 2px rgba(255, 255, 255, 0.05);
+            padding: 2rem 2rem 2.5rem;
+            border: 1px solid #2a3545;
+        }
+
+        .location-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding: 0 0.5rem;
+        }
+
+        .location {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            color: #b8c7dd;
+            font-size: 1rem;
+            font-weight: 400;
+            letter-spacing: 0.03em;
+        }
+
+        .location svg {
+            width: 1.25rem;
+            height: 1.25rem;
+            fill: none;
+            stroke: #7f9bcb;
+            stroke-width: 1.8;
+        }
+
+        .live-badge {
+            background: #1e2a3a;
+            padding: 0.3rem 0.9rem;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #9bb9e0;
+            border: 1px solid #304358;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #40c47e;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #40c47e;
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        /* Permission / status banner */
+        .status-banner {
+            background: #1a2332;
+            border: 1px solid #2e4058;
+            border-radius: 1.5rem;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: #b8c7dd;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .status-banner.hidden {
+            display: none;
+        }
+
+        .status-banner svg {
+            flex-shrink: 0;
+            width: 1.5rem;
+            height: 1.5rem;
+            stroke: #7f9bcb;
+            fill: none;
+            stroke-width: 1.8;
+        }
+
+        .permission-btn {
+            background: #2d4a6b;
+            border: none;
+            color: #eef3fc;
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 0.65rem 1.4rem;
+            border-radius: 40px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s;
+            font-family: inherit;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        .permission-btn:hover {
+            background: #3a5f88;
+        }
+
+        .permission-btn:active {
+            background: #234058;
+        }
+
+        /* Compass */
+        .compass-wrapper {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            margin: 0.5rem 0 1.5rem;
+        }
+
+        .compass-svg-container {
+            width: 100%;
+            max-width: 380px;
+            aspect-ratio: 1/1;
+            position: relative;
+        }
+
+        .compass-svg-container svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Rotating compass dial (magnetic north rotates with device) */
+        .dial-rotator {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.15s ease-out;
+            will-change: transform;
+        }
+
+        /* Sun direction marker – fixed to magnetic north frame */
+        .sun-marker-absolute {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-left: 12px solid transparent;
+            border-right: 12px solid transparent;
+            border-bottom: 32px solid #fbbf24;
+            filter: drop-shadow(0 0 12px rgba(251, 191, 36, 0.7));
+            transform: translate(-50%, -100%) rotate(0deg);
+            transform-origin: center bottom;
+            transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.4, 1);
+        }
+
+        .sun-dot-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            background: #fbbf24;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 24px #fbbf24, 0 0 8px #fff9e6;
+            pointer-events: none;
+        }
+
+        /* data cards */
+        .data-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .data-card {
+            background: #0d131f;
+            border-radius: 2rem;
+            padding: 1.2rem 1.5rem;
+            border: 1px solid #253040;
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.02);
+        }
+
+        .data-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #7a8ca8;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .data-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #eef3fc;
+            line-height: 1.2;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .data-unit {
+            font-size: 0.9rem;
+            font-weight: 400;
+            color: #8a9bb8;
+            margin-left: 0.2rem;
+        }
+
+        .data-sub {
+            font-size: 0.8rem;
+            color: #5e718b;
+            margin-top: 0.35rem;
+        }
+
+        .azimuth-direction {
+            font-size: 1rem;
+            color: #b8c7dd;
+            margin-top: 0.4rem;
+            font-weight: 400;
+            letter-spacing: 0.02em;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #4c5b70;
+            margin-top: 1.8rem;
+            letter-spacing: 0.02em;
+            border-top: 1px solid #202a38;
+            padding-top: 1.2rem;
+        }
+
+        /* Fallback note */
+        .fallback-note {
+            background: #2a1f1a;
+            border: 1px solid #4a3528;
+            color: #d4a373;
+            border-radius: 1rem;
+            padding: 0.8rem 1.2rem;
+            font-size: 0.8rem;
+            margin-top: 1rem;
+            display: none;
+            line-height: 1.5;
+        }
+
+        .fallback-note.visible {
+            display: block;
+        }
+
+        .fallback-note code {
+            background: #1a1410;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        @media (max-width: 500px) {
+            .app-container { padding: 1.5rem 1.2rem; border-radius: 2.5rem; }
+            .data-panel { gap: 0.8rem; }
+            .data-card { padding: 1rem 1rem; }
+            .data-value { font-size: 1.6rem; }
+            .compass-svg-container { max-width: 300px; }
+            .status-banner { flex-wrap: wrap; }
+            .permission-btn { margin-left: 0; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="location-header">
+            <div class="location">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                </svg>
+                <span>Glasgow, Scotland</span>
+            </div>
+            <div class="live-badge">
+                <span class="live-dot"></span> LIVE
+            </div>
+        </div>
+
+        <!-- Permission / status banner -->
+        <div class="status-banner" id="statusBanner">
+            <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 16v-4M12 8h.01"/>
+            </svg>
+            <span id="statusText">Compass permission required. Tap start to enable the live magnetic compass.</span>
+            <button class="permission-btn" id="permissionBtn">Start Compass</button>
+        </div>
+
+        <!-- Fallback note for non-iOS or unsupported devices -->
+        <div class="fallback-note" id="fallbackNote">
+            ⚠️ <strong>Compass not available.</strong> This device or browser doesn't expose a magnetic compass heading. 
+            The sun direction is still shown relative to magnetic north using the calculated azimuth. 
+            For live compass integration, use an iPhone with Safari.
+        </div>
+
+        <!-- Compass visual -->
+        <div class="compass-wrapper">
+            <div class="compass-svg-container">
+                <!-- The compass dial rotates to keep "N" pointing at magnetic north -->
+                <div class="dial-rotator" id="dialRotator">
+                    <svg viewBox="0 0 400 400" id="compassSvg">
+                        <circle cx="200" cy="200" r="180" fill="none" stroke="#253040" stroke-width="1.5"/>
+                        <circle cx="200" cy="200" r="160" fill="none" stroke="#1f2b3a" stroke-width="1"/>
+                        <circle cx="200" cy="200" r="140" fill="none" stroke="#1a2432" stroke-width="1"/>
+                        <circle cx="200" cy="200" r="120" fill="none" stroke="#141e2b" stroke-width="1"/>
+                        
+                        <g id="ticksGroup"></g>
+
+                        <!-- Cardinal labels (rotate with dial) -->
+                        <text x="200" y="52" text-anchor="middle" fill="#cbd9f0" font-size="18" font-weight="500" font-family="Inter, sans-serif">N</text>
+                        <text x="352" y="208" text-anchor="middle" fill="#8da1c2" font-size="16" font-weight="400" font-family="Inter, sans-serif">E</text>
+                        <text x="200" y="362" text-anchor="middle" fill="#8da1c2" font-size="16" font-weight="400" font-family="Inter, sans-serif">S</text>
+                        <text x="48" y="208" text-anchor="middle" fill="#8da1c2" font-size="16" font-weight="400" font-family="Inter, sans-serif">W</text>
+
+                        <text x="305" y="100" text-anchor="middle" fill="#4f6382" font-size="11" font-family="Inter, sans-serif">NE</text>
+                        <text x="305" y="310" text-anchor="middle" fill="#4f6382" font-size="11" font-family="Inter, sans-serif">SE</text>
+                        <text x="95" y="310" text-anchor="middle" fill="#4f6382" font-size="11" font-family="Inter, sans-serif">SW</text>
+                        <text x="95" y="100" text-anchor="middle" fill="#4f6382" font-size="11" font-family="Inter, sans-serif">NW</text>
+                    </svg>
+                </div>
+
+                <!-- Sun marker: fixed to the compass frame (magnetic north) -->
+                <div class="sun-dot-center"></div>
+                <div class="sun-marker-absolute" id="sunMarker"></div>
+            </div>
+        </div>
+
+        <!-- Data panel -->
+        <div class="data-panel">
+            <div class="data-card">
+                <div class="data-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8ca8" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 2 L12 6 M12 18 L12 22 M2 12 L6 12 M18 12 L22 12"/>
+                    </svg>
+                    Magnetic Heading
+                </div>
+                <div class="data-value" id="headingValue">—</div>
+                <div class="data-sub">clockwise from magnetic north</div>
+                <div class="azimuth-direction" id="headingDirection">—</div>
+            </div>
+            <div class="data-card">
+                <div class="data-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8ca8" stroke-width="2">
+                        <path d="M12 2 L12 6 M12 18 L12 22 M2 12 L6 12 M18 12 L22 12"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    Sun Azimuth
+                </div>
+                <div class="data-value" id="azimuthValue">—</div>
+                <div class="data-sub">magnetic bearing to Sun</div>
+                <div class="azimuth-direction" id="azimuthDirection">—</div>
+            </div>
+        </div>
+
+        <!-- Extra info row -->
+        <div class="data-panel" style="margin-top: 0.8rem;">
+            <div class="data-card" style="grid-column: span 2;">
+                <div class="data-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a8ca8" stroke-width="2">
+                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                    </svg>
+                    Sun Altitude
+                </div>
+                <div class="data-value" id="altitudeValue" style="font-size: 1.6rem;">—</div>
+                <div class="data-sub" id="sunStatus" style="margin-top: 0.25rem;">—</div>
+            </div>
+        </div>
+
+        <div class="footer-note">
+            Magnetic-north reference · Glasgow (55.86°N, 4.25°W) · <span id="timestamp"></span>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // Glasgow coordinates
+            const LAT = 55.8642;
+            const LNG = -4.2518;
+
+            // DOM elements
+            const statusBanner = document.getElementById('statusBanner');
+            const statusText = document.getElementById('statusText');
+            const permissionBtn = document.getElementById('permissionBtn');
+            const fallbackNote = document.getElementById('fallbackNote');
+
+            const dialRotator = document.getElementById('dialRotator');
+            const sunMarker = document.getElementById('sunMarker');
+
+            const headingValue = document.getElementById('headingValue');
+            const headingDirection = document.getElementById('headingDirection');
+            const azimuthValue = document.getElementById('azimuthValue');
+            const azimuthDirection = document.getElementById('azimuthDirection');
+            const altitudeValue = document.getElementById('altitudeValue');
+            const sunStatus = document.getElementById('sunStatus');
+            const timestampSpan = document.getElementById('timestamp');
+
+            // Compass state
+            let magneticHeading = null;   // degrees clockwise from magnetic north, 0-360
+            let compassStarted = false;
+            let permissionGranted = false;
+            let lastOrientationTime = 0;
+
+            // ---- Generate degree ticks ----
+            function generateTicks() {
+                const ticksGroup = document.getElementById('ticksGroup');
+                if (!ticksGroup) return;
+                const cx = 200, cy = 200;
+                const outerR = 170;
+                const innerR = 158;
+                const innerMinorR = 164;
+
+                for (let deg = 0; deg < 360; deg += 5) {
+                    const rad = (deg - 90) * Math.PI / 180;
+                    const isMajor = deg % 10 === 0;
+                    const r1 = isMajor ? innerR : innerMinorR;
+                    const r2 = outerR;
+
+                    const x1 = cx + r1 * Math.cos(rad);
+                    const y1 = cy + r1 * Math.sin(rad);
+                    const x2 = cx + r2 * Math.cos(rad);
+                    const y2 = cy + r2 * Math.sin(rad);
+
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', x1);
+                    line.setAttribute('y1', y1);
+                    line.setAttribute('x2', x2);
+                    line.setAttribute('y2', y2);
+                    line.setAttribute('stroke', isMajor ? '#5f7b9e' : '#2e4055');
+                    line.setAttribute('stroke-width', isMajor ? '2' : '1');
+                    line.setAttribute('stroke-linecap', 'round');
+                    ticksGroup.appendChild(line);
+                }
+            }
+
+            // ---- Direction name from degrees ----
+            function getDirectionName(deg) {
+                const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                              'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+                const idx = Math.round(deg / 22.5) % 16;
+                return dirs[idx];
+            }
+
+            // ---- Sun position (azimuth relative to magnetic north? No: computed azimuth is relative to true north) ----
+            // We compute the astronomical azimuth (true north based), then convert to magnetic
+            // by subtracting the device's magnetic heading? Actually, no.
+            // 
+            // Important distinction:
+            // The sun's azimuth (astronomical) is measured from TRUE north.
+            // The iPhone compass gives the device's heading relative to MAGNETIC north.
+            // To show the sun's position relative to magnetic north, we need:
+            //   magnetic_azimuth_sun = true_azimuth_sun - magnetic_declination
+            // Since we don't know magnetic declination without additional data,
+            // and the user asked to base everything on magnetic north, we have two choices:
+            // 1) Approximate declination (Glasgow ~ -1.5° W → subtract ~1.5°)
+            // 2) Just show the sun's azimuth relative to the phone's magnetic heading.
+            //
+            // But the app's sun marker is positioned in the magnetic-north frame (the dial rotates
+            // to keep N pointing at magnetic north). Therefore the sun marker should point at
+            // the sun's magnetic azimuth = true_azimuth - declination.
+            //
+            // Since declination in Glasgow is small (~1.5° W), we'll use a fixed approximation.
+            // This keeps everything magnetic-referenced without external APIs.
+            // For higher accuracy, a declination lookup could be added.
+            const MAGNETIC_DECLINATION_GLASGOW = -1.5; // degrees (West is negative)
+
+            function getSunPosition(date, lat, lng) {
+                const start = new Date(date.getFullYear(), 0, 0);
+                const diff = date - start;
+                const oneDay = 1000 * 60 * 60 * 24;
+                const dayOfYear = Math.floor(diff / oneDay);
+
+                const gamma = (2 * Math.PI / 365) * (dayOfYear - 1 + (date.getHours() - 12) / 24);
+
+                const eqtime = 229.18 * (0.000075 + 0.001868 * Math.cos(gamma) - 0.032077 * Math.sin(gamma) 
+                                - 0.014615 * Math.cos(2 * gamma) - 0.040849 * Math.sin(2 * gamma));
+
+                const decl = 0.006918 - 0.399912 * Math.cos(gamma) + 0.070257 * Math.sin(gamma)
+                            - 0.006758 * Math.cos(2 * gamma) + 0.000907 * Math.sin(2 * gamma)
+                            - 0.002697 * Math.cos(3 * gamma) + 0.00148 * Math.sin(3 * gamma);
+
+                const timezoneOffsetHours = -date.getTimezoneOffset() / 60;
+                const timeOffset = eqtime + 4 * lng - 60 * timezoneOffsetHours;
+                const tst = date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60 + timeOffset;
+                const ha = (tst / 4) - 180;
+
+                const latRad = lat * Math.PI / 180;
+                const declRad = decl;
+                const haRad = ha * Math.PI / 180;
+
+                const cosZenith = Math.sin(latRad) * Math.sin(declRad) + Math.cos(latRad) * Math.cos(declRad) * Math.cos(haRad);
+                const zenith = Math.acos(Math.max(-1, Math.min(1, cosZenith)));
+                const altitude = 90 - (zenith * 180 / Math.PI);
+
+                const sinZenith = Math.sin(zenith);
+                let azimuthRad;
+                if (sinZenith < 0.001) {
+                    azimuthRad = 0;
+                } else {
+                    const cosAzNum = -Math.sin(latRad) * Math.cos(zenith) - Math.sin(declRad);
+                    const cosAzDen = Math.cos(latRad) * sinZenith;
+                    let cosAz = cosAzNum / cosAzDen;
+                    cosAz = Math.max(-1, Math.min(1, cosAz));
+                    const azFromNorth = 180 - (Math.acos(cosAz) * 180 / Math.PI);
+                    if (ha > 0) {
+                        azimuthRad = (360 - azFromNorth) * Math.PI / 180;
+                    } else {
+                        azimuthRad = azFromNorth * Math.PI / 180;
+                    }
+                }
+
+                let azimuthDeg = azimuthRad * 180 / Math.PI;
+                azimuthDeg = ((azimuthDeg % 360) + 360) % 360;
+
+                return {
+                    azimuth: azimuthDeg,   // true north reference
+                    altitude: altitude
+                };
+            }
+
+            // ---- Handle orientation event (iOS magnetic compass) ----
+            function handleOrientation(event) {
+                // iOS provides webkitCompassHeading (magnetic north)
+                let heading = null;
+                if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
+                    heading = event.webkitCompassHeading;
+                } else if (event.alpha !== null && event.alpha !== undefined) {
+                    // Fallback: alpha is rotation around z-axis (0 = north in some browsers, but not reliable)
+                    // Many Android browsers use alpha relative to magnetic north, but iOS is the target
+                    // We'll only use alpha as a last resort for display continuity
+                    heading = (360 - event.alpha) % 360; // rough conversion
+                }
+
+                if (heading === null) return;
+
+                // Low-pass filter to smooth jitter
+                const now = Date.now();
+                if (now - lastOrientationTime < 100) return; // throttle
+                lastOrientationTime = now;
+
+                magneticHeading = heading;
+
+                // Update heading display
+                headingValue.textContent = magneticHeading.toFixed(1) + '°';
+                headingDirection.textContent = getDirectionName(magneticHeading);
+
+                // Rotate the compass dial so that "N" points at magnetic north
+                // If the device heading is H (clockwise from magnetic north),
+                // the dial should rotate by -H to keep N pointing north.
+                dialRotator.style.transform = `rotate(${-magneticHeading}deg)`;
+
+                // Update timestamp
+                timestampSpan.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }
+
+            // ---- Request permission (iOS) ----
+            async function startCompass() {
+                if (compassStarted) return;
+                compassStarted = true;
+
+                try {
+                    // Check for iOS permission API
+                    if (typeof DeviceOrientationEvent !== 'undefined' && 
+                        typeof DeviceOrientationEvent.requestPermission === 'function') {
+                        const permission = await DeviceOrientationEvent.requestPermission();
+                        if (permission === 'granted') {
+                            permissionGranted = true;
+                            statusText.textContent = 'Compass active. Move your device to see the magnetic heading update.';
+                            permissionBtn.textContent = 'Active';
+                            permissionBtn.disabled = true;
+                            permissionBtn.style.opacity = '0.6';
+                            permissionBtn.style.cursor = 'default';
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            // Hide banner after a moment
+                            setTimeout(() => {
+                                statusBanner.classList.add('hidden');
+                            }, 3000);
+                        } else {
+                            statusText.textContent = 'Permission denied. The compass will not update live. Using calculated azimuth relative to magnetic north (with ±1.5° approximation).';
+                            permissionBtn.textContent = 'Retry';
+                            permissionBtn.disabled = false;
+                            compassStarted = false;
+                            fallbackNote.classList.add('visible');
+                        }
+                    } else if (typeof DeviceOrientationEvent !== 'undefined') {
+                        // Non-iOS or older iOS: try to listen anyway
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        statusText.textContent = 'Compass active (using device orientation).';
+                        permissionBtn.textContent = 'Active';
+                        permissionBtn.disabled = true;
+                        permissionBtn.style.opacity = '0.6';
+                        permissionBtn.style.cursor = 'default';
+                        permissionGranted = true;
+                        setTimeout(() => {
+                            statusBanner.classList.add('hidden');
+                        }, 3000);
+                    } else {
+                        throw new Error('DeviceOrientationEvent not supported');
+                    }
+                } catch (err) {
+                    console.warn('Compass error:', err);
+                    statusText.textContent = 'Compass unavailable. Showing sun direction relative to magnetic north (with ±1.5° approximation).';
+                    permissionBtn.textContent = 'Unavailable';
+                    permissionBtn.disabled = true;
+                    permissionBtn.style.opacity = '0.6';
+                    fallbackNote.classList.add('visible');
+                }
+            }
+
+            // ---- Main update loop ----
+            function update() {
+                const now = new Date();
+                const pos = getSunPosition(now, LAT, LNG);
+
+                // Convert true azimuth to magnetic azimuth by subtracting declination
+                // (declination is West negative, so subtracting a negative adds)
+                let magneticAzimuthSun = (pos.azimuth - MAGNETIC_DECLINATION_GLASGOW) % 360;
+                if (magneticAzimuthSun < 0) magneticAzimuthSun += 360;
+
+                // Display sun azimuth (magnetic)
+                const azRounded = Math.round(magneticAzimuthSun * 10) / 10;
+                const altRounded = Math.round(pos.altitude * 10) / 10;
+
+                azimuthValue.textContent = azRounded.toFixed(1) + '°';
+                azimuthDirection.textContent = getDirectionName(azRounded);
+
+                // Altitude
+                altitudeValue.textContent = altRounded.toFixed(1) + '°';
+                
+                if (pos.altitude > 0) {
+                    sunStatus.textContent = 'Above horizon';
+                } else if (pos.altitude > -6) {
+                    sunStatus.textContent = 'Civil twilight';
+                } else if (pos.altitude > -12) {
+                    sunStatus.textContent = 'Nautical twilight';
+                } else if (pos.altitude > -18) {
+                    sunStatus.textContent = 'Astronomical twilight';
+                } else {
+                    sunStatus.textContent = 'Below horizon (night)';
+                }
+
+                // Position the sun marker (in magnetic-north frame, since dial rotates)
+                // The sun marker is fixed to the outer container (not rotated by dial),
+                // so it should point at the magnetic azimuth directly.
+                sunMarker.style.transform = `translate(-50%, -100%) rotate(${magneticAzimuthSun}deg)`;
+
+                // Update timestamp
+                timestampSpan.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                // If compass is active, heading display is updated by handleOrientation.
+                // If not, show a static "—" or set to magnetic north? 
+                // We'll leave it showing the last known value, or "—" if never started.
+                if (magneticHeading === null) {
+                    headingValue.textContent = '—';
+                    headingDirection.textContent = 'Compass not started';
+                    // Keep dial at 0 rotation (N pointing up, approximating magnetic north)
+                    dialRotator.style.transform = 'rotate(0deg)';
+                }
+            }
+
+            // ---- Initialize ----
+            generateTicks();
+            update();
+            setInterval(update, 1000);
+
+            // Button event
+            permissionBtn.addEventListener('click', startCompass);
+
+            // Check if compass API exists at all
+            if (typeof DeviceOrientationEvent === 'undefined') {
+                statusText.textContent = 'Compass API not available on this device/browser.';
+                permissionBtn.textContent = 'Unsupported';
+                permissionBtn.disabled = true;
+                permissionBtn.style.opacity = '0.6';
+                fallbackNote.classList.add('visible');
+            }
+
+            // If not iOS, we can auto-start on page load? No, user gesture might be needed anyway.
+            // But for non-iOS, we can start without permission (Android Chrome etc.)
+            // We'll still show the button to let the user initiate.
+
+            // Auto-start attempt for non-iOS after a short delay (optional, but better to let user tap)
+            // We'll leave manual start for all.
+
+        })();
+    </script>
+</body>
+</html>
